@@ -55,11 +55,16 @@ contract RoundsBase is
         uint256 startingTime,
         uint256 endingTime
     );
+    event RoundEnded(uint256 indexed roundNumber);
     event UserRegistered(address indexed user);
     event VoteCast(address indexed voter, uint256 round, address[] recipients);
+    event CandidateEliminated(address indexed candidate, uint256 round);
 
     error RecipientEliminated();
+    error InvalidBallot();
     error InvalidRound();
+    error RoundFullyProcessed();
+    error RoundNotProcessed();
     error RegistrationClosed();
     error UserAlreadyRegistered();
     error PreviousRoundNotOver();
