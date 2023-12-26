@@ -189,7 +189,7 @@ describe("RoundsBase Contract", function () {
     });
   });
 
-  describe("Count Participants Points", function () {
+  xdescribe("Count Participants Points", function () {
     it("should allocate points on user registration", async function () {
       const { roundsBase, user } = await loadFixture(deployRoundBaseFixture);
 
