@@ -1,0 +1,21 @@
+type Query {
+  llamaCoreInstance(id: String!, timestamp: Int): LlamaCoreInstance
+  llamaCoreInstances(skip: Int = 0, first: Int = 100, orderBy: String = "id", orderDirection: String = "asc", where: LlamaCoreInstanceFilter, timestamp: Int): [LlamaCoreInstance!]!
+}
+
+type LlamaCoreInstance {
+  id: String!
+}
+
+input LlamaCoreInstanceFilter {
+  id: String
+  id_not: String
+  id_in: [String]
+  id_not_in: [String]
+  id_contains: String
+  id_not_contains: String
+  id_starts_with: String
+  id_ends_with: String
+  id_not_starts_with: String
+  id_not_ends_with: String
+}

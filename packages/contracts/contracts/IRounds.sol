@@ -27,7 +27,7 @@ interface IRounds {
     enum RoundStatus { NOT_STARTED, ACTIVE, ENDED, DOES_NOT_EXIST }
     enum ContestStatus { PENDING, ACTIVE, ENDED }
     enum CandidateStatus { UNREGISTERED, REGISTERED, ELIMINATED }
-
+    event ContestCreated(Setting settings);
 
     event RoundStarted(
         uint256 indexed roundNumber,
@@ -37,7 +37,7 @@ interface IRounds {
     );
     event RoundEnded(uint256 indexed roundNumber);
     event UserRegistered(address indexed user);
-    event VoteCast(address indexed voter, uint256 round, address[] recipients);
+    event VoteCast(address indexed voter, uint256 round, uint256 amount, address recipient);
 
     // event CandidateEliminated(address indexed candidate, uint256 round);
 

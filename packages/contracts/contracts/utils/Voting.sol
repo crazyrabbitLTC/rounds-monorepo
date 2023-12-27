@@ -46,6 +46,9 @@ contract Voting {
     /// @dev Next available node ID.
     uint256 public nextId = 1;
 
+    /// @dev Address of the first candidate with zero votes.
+    address public firstZeroVoteAddress;
+
     /// @dev Cast a vote for a recipient.
     /// @param recipient The address of the recipient.
     /// @param voteCount The number of votes to cast.
@@ -94,38 +97,43 @@ contract Voting {
     /// @dev Add a new node in a sorted position.
     /// @param recipient The address of the new recipient.
     /// @param voteCount The number of votes for the new recipient.
-    function addNewNode(address recipient, uint256 voteCount) internal {
-        Node memory newNode = Node({
-            votes: voteCount,
-            recipient: recipient,
-            prev: 0,
-            next: 0
-        });
-        uint256 currentId = head;
-        uint256 prevId = 0;
-        while (currentId != 0 && list[currentId].votes >= voteCount) {
-            prevId = currentId;
-            currentId = list[currentId].next;
-        }
-        newNode.prev = prevId;
-        newNode.next = currentId;
-        list[nextId] = newNode;
-        addressToNodeId[recipient] = nextId;
-
-        emit NewNodeAdded(nextId, recipient, voteCount);
-
-        if (prevId != 0) {
-            list[prevId].next = nextId;
-        } else {
-            head = nextId;
-        }
-        if (currentId != 0) {
-            list[currentId].prev = nextId;
-        } else {
-            tail = nextId;
-        }
-        nextId++;
+function addNewNode(address recipient, uint256 voteCount) internal {
+    Node memory newNode = Node({
+        votes: voteCount,
+        recipient: recipient,
+        prev: 0,
+        next: 0
+    });
+    uint256 currentId = head;
+    uint256 prevId = 0;
+    while (currentId != 0 && list[currentId].votes >= voteCount) {
+        prevId = currentId;
+        currentId = list[currentId].next;
     }
+    newNode.prev = prevId;
+    newNode.next = currentId;
+    list[nextId] = newNode;
+    addressToNodeId[recipient] = nextId;
+
+    emit NewNodeAdded(nextId, recipient, voteCount);
+
+    if (prevId != 0) {
+        list[prevId].next = nextId;
+    } else {
+        head = nextId;
+        // Update firstZeroVoteAddress if this is the first node with zero votes
+        if (voteCount == 0 && firstZeroVoteAddress == address(0)) {
+            firstZeroVoteAddress = recipient;
+        }
+    }
+    if (currentId != 0) {
+        list[currentId].prev = nextId;
+    } else {
+        tail = nextId;
+    }
+    nextId++;
+}
+
 
     /// @dev Swap two nodes to maintain the sorted order.
     /// @param nodeA Reference to the first Node.
@@ -245,5 +253,10 @@ contract Voting {
         } else {
             return address(0); // Return zero address if index is out of bounds
         }
+    }
+
+    //TBD if I need this
+    function resetFirstZeroVoteAddress() private {
+        firstZeroVoteAddress = address(0);
     }
 }

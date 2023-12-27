@@ -407,7 +407,7 @@ describe("RoundsBase Contract", function () {
       await expect(roundsBase.connect(admin).startNextRound());
       await expect(roundsBase.connect(user).castVote([user.address]))
         .to.emit(roundsBase, "VoteCast")
-        .withArgs(user.address, 0, [user.address]);
+        .withArgs(user.address, 0, 1, user.address);
     });
 
     it("should revert vote casting for non-registered users", async function () {

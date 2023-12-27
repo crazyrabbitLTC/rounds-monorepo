@@ -30,8 +30,10 @@ contract RoundsBase is Base {
     function initialize(Setting calldata _settings) public initializer {
         Base.BaseInitialize(_settings);
         _grantRole(DEFAULT_ADMIN_ROLE, settings.admin);
+
         // Setup a total vote stracker
         roundTracker = new Voting();
+        emit ContestCreated(_settings);
     }
 
     function register() public payable override {
@@ -59,8 +61,8 @@ contract RoundsBase is Base {
                 defaultVoteAmount
             );
             _tallyTotalVotes(recipients[i], defaultVoteAmount);
+        emit VoteCast(msg.sender, currentRound, defaultVoteAmount, recipients[i]);
         }
-        emit VoteCast(msg.sender, currentRound, recipients);
     }
 
     function _tallyTotalVotes(address recipient, uint256 votes) internal {
