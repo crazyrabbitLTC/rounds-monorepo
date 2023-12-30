@@ -1,36 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import {IVoting} from "./IVoting.sol";
+
 /// @title Voting Contract
 /// @dev This contract allows users to vote for candidates.
-contract Voting {
-    /// @notice Event emitted when a new node is added.
-    event NewNodeAdded(
-        uint256 indexed nodeId,
-        address recipient,
-        uint256 votes
-    );
-
-    /// @notice Event emitted when a node is updated.
-    event NodeUpdated(uint256 indexed nodeId, uint256 newVotes);
-
-    /// @notice Event emitted when nodes are swapped.
-    event NodesSwapped(uint256 indexed nodeIdA, uint256 indexed nodeIdB);
-
-    /// @notice Struct representing a voting node.
-    struct Node {
-        uint256 votes; ///< Number of votes.
-        address recipient; ///< Candidate's address.
-        uint256 prev; ///< ID of the previous node.
-        uint256 next; ///< ID of the next node.
-    }
-
-    /// @notice Struct representing a voting result.
-    struct Result {
-        address recipient; ///< Candidate's address.
-        uint256 votes; ///< Number of votes.
-    }
-
+contract Voting is IVoting {
     /// @dev Mapping from node ID to Node.
     mapping(uint256 => Node) public list;
 
@@ -97,43 +72,42 @@ contract Voting {
     /// @dev Add a new node in a sorted position.
     /// @param recipient The address of the new recipient.
     /// @param voteCount The number of votes for the new recipient.
-function addNewNode(address recipient, uint256 voteCount) internal {
-    Node memory newNode = Node({
-        votes: voteCount,
-        recipient: recipient,
-        prev: 0,
-        next: 0
-    });
-    uint256 currentId = head;
-    uint256 prevId = 0;
-    while (currentId != 0 && list[currentId].votes >= voteCount) {
-        prevId = currentId;
-        currentId = list[currentId].next;
-    }
-    newNode.prev = prevId;
-    newNode.next = currentId;
-    list[nextId] = newNode;
-    addressToNodeId[recipient] = nextId;
-
-    emit NewNodeAdded(nextId, recipient, voteCount);
-
-    if (prevId != 0) {
-        list[prevId].next = nextId;
-    } else {
-        head = nextId;
-        // Update firstZeroVoteAddress if this is the first node with zero votes
-        if (voteCount == 0 && firstZeroVoteAddress == address(0)) {
-            firstZeroVoteAddress = recipient;
+    function addNewNode(address recipient, uint256 voteCount) internal {
+        Node memory newNode = Node({
+            votes: voteCount,
+            recipient: recipient,
+            prev: 0,
+            next: 0
+        });
+        uint256 currentId = head;
+        uint256 prevId = 0;
+        while (currentId != 0 && list[currentId].votes >= voteCount) {
+            prevId = currentId;
+            currentId = list[currentId].next;
         }
-    }
-    if (currentId != 0) {
-        list[currentId].prev = nextId;
-    } else {
-        tail = nextId;
-    }
-    nextId++;
-}
+        newNode.prev = prevId;
+        newNode.next = currentId;
+        list[nextId] = newNode;
+        addressToNodeId[recipient] = nextId;
 
+        emit NewNodeAdded(nextId, recipient, voteCount);
+
+        if (prevId != 0) {
+            list[prevId].next = nextId;
+        } else {
+            head = nextId;
+            // Update firstZeroVoteAddress if this is the first node with zero votes
+            if (voteCount == 0 && firstZeroVoteAddress == address(0)) {
+                firstZeroVoteAddress = recipient;
+            }
+        }
+        if (currentId != 0) {
+            list[currentId].prev = nextId;
+        } else {
+            tail = nextId;
+        }
+        nextId++;
+    }
 
     /// @dev Swap two nodes to maintain the sorted order.
     /// @param nodeA Reference to the first Node.
@@ -206,10 +180,10 @@ function addNewNode(address recipient, uint256 voteCount) internal {
     /// @return The position of the node (0 if not found or no votes).
     function getPositionByAddress(address addr) public view returns (uint256) {
         if (!hasReceivedVotes(addr)) {
-            return 0;
+            return 0; // Address not found or no votes
         }
         uint256 currentId = head;
-        uint256 position = 1; // Start from position 1
+        uint256 position = 0;
         while (currentId != 0) {
             if (list[currentId].recipient == addr) {
                 return position;
@@ -253,6 +227,80 @@ function addNewNode(address recipient, uint256 voteCount) internal {
         } else {
             return address(0); // Return zero address if index is out of bounds
         }
+    }
+
+function calculatePointFromPercentage(uint256 percentage, bool roundUp) public view returns (uint256) {
+    require(percentage >= 0 && percentage <= 100, "Percentage must be between 0 and 100");
+    uint256 totalNodes = getTotalNodeCount();
+    if (totalNodes == 0) {
+        return 0; // List is empty
+    }
+
+    uint256 position;
+    if (percentage == 0) {
+        position = 0; // Always return the first node for 0%
+    } else if (percentage == 100) {
+        position = totalNodes - 1; // Always return the last node for 100%
+    } else {
+        position = (totalNodes * percentage) / 100;
+        if (roundUp && (totalNodes * percentage) % 100 > 0) {
+            position = (position < totalNodes - 1) ? position + 1 : position;
+        }
+    }
+
+    return getNodeAtPosition(position);
+}
+
+
+
+    /// @notice Get the node ID at a specific position in the list.
+    /// @param position The position in the list.
+    /// @return The ID of the node at the given position.
+function getNodeAtPosition(uint256 position) internal view returns (uint256) {
+    uint256 currentId = head;
+    for (uint256 i = 0; i < position && currentId != 0; i++) {
+        currentId = list[currentId].next;
+    }
+    return currentId;
+}
+
+
+    /// @notice Update the head and tail of the list.
+    /// @param newHead The new head of the list.
+    /// @param newTail The new tail of the list.
+    function updateHeadAndTail(uint256 newHead, uint256 newTail) external {
+        require(newHead <= newTail, "New head must be before new tail");
+        require(
+            newHead >= 0 && newTail < nextId,
+            "Head and tail must be within list bounds"
+        );
+        head = newHead;
+        tail = newTail;
+    }
+
+    function getCandidateVotes(
+        address candidateAddress
+    ) public view returns (uint256) {
+        uint256 nodeId = addressToNodeId[candidateAddress];
+        if (nodeId == 0) {
+            return 0; // Candidate not found
+        }
+        return list[nodeId].votes;
+    }
+
+    function getCandidateStatus(
+        address candidateAddress
+    ) public view returns (CandidateStatus) {
+        uint256 nodeId = addressToNodeId[candidateAddress];
+        if (nodeId == 0) {
+            return CandidateStatus.UNREGISTERED;
+        }
+
+        if (nodeId < head || nodeId > tail) {
+            return CandidateStatus.ELIMINATED;
+        }
+
+        return CandidateStatus.ACTIVE;
     }
 
     //TBD if I need this

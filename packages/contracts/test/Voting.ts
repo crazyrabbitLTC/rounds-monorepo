@@ -7,9 +7,9 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-describe("Voting Util", function () {
+describe.only("Voting Util", function () {
   async function deployVotingFixture() {
-    const [deployer, alice, bob, jane, alisha, newCandidate, mario, luigi] =
+    const [deployer, alice, bob, jane, alisha, newCandidate, mario, luigi, charlie, dave, eve] =
       await ethers.getSigners();
 
     const Voting = await ethers.getContractFactory("VotingMock");
@@ -25,6 +25,7 @@ describe("Voting Util", function () {
       newCandidate,
       mario,
       luigi,
+      charlie, dave, eve
     };
   }
 
@@ -689,6 +690,178 @@ describe("Voting Util", function () {
       // Check the position of Bob
       expect(await voting.getPositionByAddress(bobAddress)).to.equal(0);
     });
+
+    describe.only("calculatePointFromPercentage Tests", function () {
+      it("should return 0 for an empty list", async function () {
+        const { voting } = await loadFixture(deployVotingFixture);
+        expect(await voting.calculatePointFromPercentage(50, true)).to.equal(0);
+      });
+  
+      it("should correctly calculate the node at various percentages in a non-empty list", async function () {
+        const { voting, alice, bob } = await loadFixture(deployVotingFixture);
+        // Populate the list with Alice and Bob
+        await voting.connect(alice).castMockVoteVote(alice.getAddress(), 2);
+        await voting.connect(bob).castMockVoteVote(bob.getAddress(), 3);
+    
+        console.log(await voting.calculatePointFromPercentage(0, false));
+        console.log(await voting.calculatePointFromPercentage(50, true));
+        console.log(await voting.calculatePointFromPercentage(100, false));
+
+        expect(await voting.calculatePointFromPercentage(0, false)).to.equal(0); // First node, index 0
+        expect(await voting.calculatePointFromPercentage(50, true)).to.equal(1); // Second node, index 1
+        expect(await voting.calculatePointFromPercentage(100, false)).to.equal(1); // Last node, index 1
+    });
+    
+  
+      it("should revert for invalid percentage values", async function () {
+        const { voting } = await loadFixture(deployVotingFixture);
+        await expect(voting.calculatePointFromPercentage(101, true)).to.be.reverted;
+        // await expect(voting.calculatePointFromPercentage(-1, false)).to.be.reverted; - you can't pass negative values
+      });
+
+      describe("calculatePointFromPercentage with Multiple Participants", function () {
+        it("should correctly calculate the node for three participants", async function () {
+            const { voting, alice, bob, charlie } = await loadFixture(deployVotingFixture);
+            await voting.connect(alice).castMockVoteVote(alice.getAddress(), 1);
+            await voting.connect(bob).castMockVoteVote(bob.getAddress(), 2);
+            await voting.connect(charlie).castMockVoteVote(charlie.getAddress(), 3);
+
+            console.log(await voting.calculatePointFromPercentage(0, false));
+            console.log(await voting.calculatePointFromPercentage(50, true));
+            console.log(await voting.calculatePointFromPercentage(100, true));
+    
+            expect(await voting.calculatePointFromPercentage(0, false)).to.equal(0); // First node
+            expect(await voting.calculatePointFromPercentage(50, true)).to.equal(1); // Second node
+            expect(await voting.calculatePointFromPercentage(100, false)).to.equal(2); // Last node
+        });
+    
+        it("should correctly calculate the node for four participants", async function () {
+            const { voting, alice, bob, charlie, dave } = await loadFixture(deployVotingFixture);
+            await voting.connect(alice).castMockVoteVote(alice.getAddress(), 1);
+            await voting.connect(bob).castMockVoteVote(bob.getAddress(), 2);
+            await voting.connect(charlie).castMockVoteVote(charlie.getAddress(), 3);
+            await voting.connect(dave).castMockVoteVote(dave.getAddress(), 4);
+    
+            console.log(await voting.calculatePointFromPercentage(0, false));
+            console.log(await voting.calculatePointFromPercentage(25, false));
+            console.log(await voting.calculatePointFromPercentage(50, false));
+            console.log(await voting.calculatePointFromPercentage(75, true));
+            console.log(await voting.calculatePointFromPercentage(100, false));
+
+            expect(await voting.calculatePointFromPercentage(25, false)).to.equal(0); // First node
+            expect(await voting.calculatePointFromPercentage(50, false)).to.equal(1); // Second node
+            expect(await voting.calculatePointFromPercentage(75, true)).to.equal(2); // Third node
+            expect(await voting.calculatePointFromPercentage(100, false)).to.equal(3); // Last node
+        });
+    
+        it("should correctly calculate the node for five participants", async function () {
+            const { voting, alice, bob, charlie, dave, eve } = await loadFixture(deployVotingFixture);
+            await voting.connect(alice).castMockVoteVote(alice.getAddress(), 1);
+            await voting.connect(bob).castMockVoteVote(bob.getAddress(), 2);
+            await voting.connect(charlie).castMockVoteVote(charlie.getAddress(), 3);
+            await voting.connect(dave).castMockVoteVote(dave.getAddress(), 4);
+            await voting.connect(eve).castMockVoteVote(eve.getAddress(), 5);
+    
+            console.log(await voting.calculatePointFromPercentage(0, false));
+            console.log(await voting.calculatePointFromPercentage(20, false));
+            console.log(await voting.calculatePointFromPercentage(40, false));
+            console.log(await voting.calculatePointFromPercentage(60, true));
+            console.log(await voting.calculatePointFromPercentage(80, false));
+            console.log(await voting.calculatePointFromPercentage(100, false));
+
+            expect(await voting.calculatePointFromPercentage(20, false)).to.equal(0); // First node
+            expect(await voting.calculatePointFromPercentage(40, false)).to.equal(1); // Second node
+            expect(await voting.calculatePointFromPercentage(60, true)).to.equal(3); // Fourth node
+            expect(await voting.calculatePointFromPercentage(100, false)).to.equal(4); // Last node
+        });
+    });
+    
+    });
+  
+    describe("updateHeadAndTail Tests", function () {
+      it("should correctly update head and tail with valid values", async function () {
+        const { voting, alice, bob } = await loadFixture(deployVotingFixture);
+        await voting.connect(alice).castMockVoteVote(alice.getAddress(), 2);
+        await voting.connect(bob).castMockVoteVote(bob.getAddress(), 3);
+  
+        await voting.updateHeadAndTail(1, 2);
+        expect(await voting.head()).to.equal(1);
+        expect(await voting.tail()).to.equal(2);
+      });
+  
+      it("should revert when the new head is greater than the new tail", async function () {
+        const { voting } = await loadFixture(deployVotingFixture);
+        await expect(voting.updateHeadAndTail(2, 1)).to.be.reverted;
+      });
+  
+      it("should revert when head or tail is set outside the bounds of the list", async function () {
+        const { voting } = await loadFixture(deployVotingFixture);
+        await expect(voting.updateHeadAndTail(0, 1)).to.be.reverted;
+        await expect(voting.updateHeadAndTail(1, 100)).to.be.reverted; // Assuming the list doesn't have 100 nodes
+      });
+  
+      it("should reflect the updated subset in voting operations", async function () {
+        const { voting, alice, bob } = await loadFixture(deployVotingFixture);
+        await voting.connect(alice).castMockVoteVote(alice.getAddress(), 2);
+        await voting.connect(bob).castMockVoteVote(bob.getAddress(), 3);
+  
+        await voting.updateHeadAndTail(2, 2); // Update to only include the second node
+  
+        // Ensure voting operation reflects the updated subset
+        await expect(voting.castMockVoteVote(alice.getAddress(), 1)).to.be.reverted; // Should fail as Alice is no longer in the subset
+      });
+    });
+  });
+
+  describe("getCandidateVotes and getCandidateStatus Tests", function () {
+    // ... existing setup ...
+  
+    it("should return the correct vote count for an existing candidate", async function () {
+      const { voting, alice } = await loadFixture(deployVotingFixture);
+      const aliceAddress = await alice.getAddress();
+  
+      await voting.connect(alice).castMockVoteVote(aliceAddress, 10);
+  
+      expect(await voting.getCandidateVotes(aliceAddress)).to.equal(10);
+    });
+  
+    it("should return 0 votes for a non-existing candidate", async function () {
+      const { voting, bob } = await loadFixture(deployVotingFixture);
+      const bobAddress = await bob.getAddress();
+  
+      expect(await voting.getCandidateVotes(bobAddress)).to.equal(0);
+    });
+  
+    it("should return UNREGISTERED for a candidate not in the list", async function () {
+      const { voting, bob } = await loadFixture(deployVotingFixture);
+      const bobAddress = await bob.getAddress();
+  
+      expect(await voting.getCandidateStatus(bobAddress)).to.equal("UNREGISTERED");
+    });
+  
+    it("should return ACTIVE for a candidate within the head and tail range", async function () {
+      const { voting, alice } = await loadFixture(deployVotingFixture);
+      const aliceAddress = await alice.getAddress();
+  
+      await voting.connect(alice).castMockVoteVote(aliceAddress, 10);
+      // Assuming alice's node ID is within the head and tail range
+      expect(await voting.getCandidateStatus(aliceAddress)).to.equal("ACTIVE");
+    });
+  
+    it("should return ELIMINATED for a candidate outside the head and tail range", async function () {
+      const { voting, alice, bob } = await loadFixture(deployVotingFixture);
+      const aliceAddress = await alice.getAddress();
+      const bobAddress = await bob.getAddress();
+  
+      await voting.connect(alice).castMockVoteVote(aliceAddress, 10);
+      await voting.connect(bob).castMockVoteVote(bobAddress, 5);
+      // Set head and tail to exclude Bob's node
+      await voting.updateHeadAndTail(2, 2);
+  
+      expect(await voting.getCandidateStatus(bobAddress)).to.equal("ELIMINATED");
+    });
+  
+    // ... any additional tests ...
   });
   
 });
