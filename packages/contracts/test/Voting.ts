@@ -7,7 +7,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-describe.only("Voting Util", function () {
+describe("Voting Util", function () {
   async function deployVotingFixture() {
     const [deployer, alice, bob, jane, alisha, newCandidate, mario, luigi, charlie, dave, eve] =
       await ethers.getSigners();
@@ -691,7 +691,7 @@ describe.only("Voting Util", function () {
       expect(await voting.getPositionByAddress(bobAddress)).to.equal(0);
     });
 
-    describe.only("calculatePointFromPercentage Tests", function () {
+    describe("calculatePointFromPercentage Tests", function () {
       it("should return 0 for an empty list", async function () {
         const { voting } = await loadFixture(deployVotingFixture);
         expect(await voting.calculatePointFromPercentage(50, true)).to.equal(0);
