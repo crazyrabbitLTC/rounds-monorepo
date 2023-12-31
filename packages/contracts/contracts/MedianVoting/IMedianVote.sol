@@ -55,7 +55,7 @@ interface IMedianVote {
     error InvalidThreshold();
     error RoundNotActive();
 
-    function registerCandidate(address user) external payable;
+    // function registerCandidate(address user) external payable;
 
     function startNextRound() external payable;
 

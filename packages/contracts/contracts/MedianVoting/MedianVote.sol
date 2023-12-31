@@ -7,6 +7,7 @@ contract MedianVote is MedianVoteBase {
 
     error RegistrationClosed();
 
+
     function initialize(
         uint256 roundDuration,
         uint256 roundDelay
@@ -14,12 +15,11 @@ contract MedianVote is MedianVoteBase {
         MedianVoteBase.__MedianVoteBaseInit(roundDuration, roundDelay);
     }
 
-    function registerCandidate(address user) public payable virtual {
+    function registerCandidate() public payable virtual {
         // Block a user from registering after a vote has started
         if (rounds.length > 0) revert RegistrationClosed();
 
-        
-        _registerCandidate(user);
+        _registerCandidate(msg.sender);
     }
 
     function startNextRound() public payable virtual {

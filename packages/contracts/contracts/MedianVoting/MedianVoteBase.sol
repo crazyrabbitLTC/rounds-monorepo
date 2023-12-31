@@ -60,7 +60,7 @@ abstract contract MedianVoteBase is Initializable, IMedianVote {
         rounds.push(
             Round(
                 block.timestamp,
-                block.timestamp + _roundDelay,
+                _roundDelay,
                 block.timestamp + _roundDuration + _roundDelay,
                 0,
                 0,
@@ -96,7 +96,8 @@ abstract contract MedianVoteBase is Initializable, IMedianVote {
         uint256 round
     ) internal view returns (RoundStatus) {
         if (round >= rounds.length) return RoundStatus.DOES_NOT_EXIST;
-        if (block.timestamp < rounds[round].startingTime)
+        
+        if (block.timestamp < rounds[round].startingTime + rounds[round].startDelay)
             return RoundStatus.PENDING;
         if (block.timestamp < rounds[round].endingTime)
             return RoundStatus.ACTIVE;
