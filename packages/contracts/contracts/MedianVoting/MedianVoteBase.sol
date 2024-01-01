@@ -7,6 +7,8 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 abstract contract MedianVoteBase is Initializable, IMedianVote {
     Round[] public rounds;
 
+    ContestStatus public contestStatus;
+
     //round => candidate => votes
     mapping(uint256 => mapping(address => uint256))
         internal _roundCandidateVotes;
@@ -15,6 +17,17 @@ abstract contract MedianVoteBase is Initializable, IMedianVote {
 
     uint256 internal _roundDuration;
     uint256 internal _roundDelay;
+
+    function __MedianVoteBaseInit(
+        uint256 roundDuration,
+        uint256 roundDelay
+    ) public onlyInitializing {
+        _roundDuration = roundDuration;
+        _roundDelay = roundDelay;
+
+        contestStatus = ContestStatus.PENDING;
+        emit NewContest(msg.sender, roundDuration, roundDelay);
+    }
 
     function getCandidateVotes(
         address _candidate,
@@ -35,14 +48,6 @@ abstract contract MedianVoteBase is Initializable, IMedianVote {
         return _getCurrentRoundIndex();
     }
 
-    function __MedianVoteBaseInit(
-        uint256 roundDuration,
-        uint256 roundDelay
-    ) public onlyInitializing {
-        _roundDuration = roundDuration;
-        _roundDelay = roundDelay;
-    }
-
     function _registerCandidate(address _candidate) internal {
         // Check if the user is already registered
         if (_candidateStatus[_candidate] != CandidateStatus.UNREGISTERED)
@@ -52,10 +57,22 @@ abstract contract MedianVoteBase is Initializable, IMedianVote {
     }
 
     function _startNextRound() internal {
-        if (
-            _getCurrentRoundIndex() > 0 &&
-            rounds[_getCurrentRoundIndex()].status != RoundStatus.FINALIZED
-        ) revert PreviousRoundNotFinalized();
+        // require that the contest has not ended
+        if (_getContestStatus() == ContestStatus.ENDED)
+            revert ContestFinished();
+
+        uint256 currentRoundIndex = _getCurrentRoundIndex();
+
+        // Check if there are any rounds before accessing the array
+        if (rounds.length > 0) {
+            RoundStatus currentRoundStatus = rounds[currentRoundIndex].status;
+
+            // check previous round status
+            if (
+                currentRoundIndex > 0 &&
+                currentRoundStatus != RoundStatus.FINALIZED
+            ) revert PreviousRoundNotFinalized();
+        }
 
         rounds.push(
             Round(
@@ -71,7 +88,19 @@ abstract contract MedianVoteBase is Initializable, IMedianVote {
         emit NewRound(_getCurrentRoundIndex());
     }
 
-    function _finalizeRound(uint256 _threshold) internal {
+    // make this virtual so that it can be overriden in the child contract
+    function _getContestStatus() internal view virtual returns (ContestStatus) {
+        // If the contest has not started, return pending
+        if (rounds.length == 0) return ContestStatus.PENDING;
+
+        // If the contest has ended, return ended
+
+        // If the contest has started and not ended, return active
+        return ContestStatus.ACTIVE;
+    }
+
+    // allow this to be overriden if finalization should be different
+    function _finalizeRound(uint256 _threshold) internal virtual {
         // require a threshold above zero
         if (_threshold == 0) revert InvalidThreshold();
 
@@ -86,10 +115,23 @@ abstract contract MedianVoteBase is Initializable, IMedianVote {
         if (_getRoundStatus(_getCurrentRoundIndex()) != RoundStatus.ENDED)
             revert RoundNotFinalized();
 
+        uint256 currentRoundIndex = _getCurrentRoundIndex();
+
         // Set the median threshold
         rounds[_getCurrentRoundIndex()].medianThreshold = _threshold;
+        // Explicitly setting the round status to FINALIZED
+        rounds[currentRoundIndex].status = RoundStatus.FINALIZED;
 
         emit RoundFinalized(_getCurrentRoundIndex(), _threshold);
+    }
+
+    function _endContest() internal virtual {
+        // If the contest has already ended, revert
+        if (_getContestStatus() == ContestStatus.ENDED)
+            revert ContestFinished();
+
+        contestStatus = ContestStatus.ENDED;
+        emit ContestEnded();
     }
 
     function _getRoundStatus(

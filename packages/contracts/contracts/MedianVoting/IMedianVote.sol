@@ -30,11 +30,19 @@ interface IMedianVote {
         ELIMINATED
     }
 
+    enum ContestStatus {
+        PENDING,
+        ACTIVE,
+        ENDED
+    }
+
     event NewContest(
         address indexed creator,
         uint256 roundDuration,
         uint256 roundDelay
     );
+
+    event ContestEnded();
     event VoteCast(
         address indexed voter,
         address indexed recipient,
@@ -54,6 +62,7 @@ interface IMedianVote {
     error InvalidRound();
     error InvalidThreshold();
     error RoundNotActive();
+    error ContestFinished();
 
     // function registerCandidate(address user) external payable;
 

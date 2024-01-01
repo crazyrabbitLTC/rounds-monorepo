@@ -15,7 +15,7 @@ contract MedianVote is MedianVoteBase {
 
     function registerCandidate() public payable virtual {
         // Block a user from registering after a vote has started
-        if (rounds.length > 0) revert RegistrationClosed();
+        if (_getContestStatus() != ContestStatus.PENDING) revert RegistrationClosed();
 
         _registerCandidate(msg.sender);
     }
