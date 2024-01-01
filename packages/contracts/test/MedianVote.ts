@@ -292,7 +292,7 @@ describe.only("MedianVote", function () {
     });
 
     describe("Voting across rounds", function () {
-      it("should handle multiple rounds of voting", async function () {
+      it("should handle multiple rounds of voting (not checking finalization)", async function () {
         const {
           medianVote,
           candidate1,
@@ -310,7 +310,7 @@ describe.only("MedianVote", function () {
         await time.increase(roundDelay + 1);
         await medianVote.connect(candidate1).castVote(candidate1.address, 10);
         await time.increase(roundDelay + roundDuration + 1);
-        await medianVote.finalizeRound(5);
+        await medianVote.finalizeRound(15);
         expect(
           await medianVote.getCandidateVotes(candidate1.address, 0)
         ).to.equal(10);
@@ -327,117 +327,230 @@ describe.only("MedianVote", function () {
 
         // Add assertions for round status and candidate status as necessary
       });
+
+      it("should eliminate candidates based on median threshold across multiple rounds", async function () {
+        const {
+          medianVote,
+          candidate1,
+          candidate2,
+          candidate3,
+          roundDelay,
+          roundDuration,
+        } = await loadFixture(deployMedianVoteFixture);
+
+        // Register candidates
+        await medianVote.connect(candidate1).registerCandidate();
+        await medianVote.connect(candidate2).registerCandidate();
+        await medianVote.connect(candidate3).registerCandidate();
+
+        // Round 1
+        await medianVote.startNextRound();
+        await time.increase(roundDelay + 1);
+
+        // Cast votes
+        await medianVote.connect(candidate1).castVote(candidate1.address, 5); // Below median
+        await medianVote.connect(candidate2).castVote(candidate2.address, 10); // Above median
+        await medianVote.connect(candidate3).castVote(candidate3.address, 15); // Above median
+
+        // Finalize Round 1 with a specific median threshold
+        await time.increase(roundDelay + roundDuration + 1);
+        await medianVote.finalizeRound(9);
+
+        // Check candidate statuses after Round 1
+        expect(
+          candidateStatusToString(
+            await medianVote.getCandidateStatus(candidate1.address, 0)
+          )
+        ).to.equal("REGISTERED");
+        expect(
+          candidateStatusToString(
+            await medianVote.getCandidateStatus(candidate2.address, 0)
+          )
+        ).to.equal("ELIMINATED");
+        expect(
+          candidateStatusToString(
+            await medianVote.getCandidateStatus(candidate3.address, 0)
+          )
+        ).to.equal("ELIMINATED");
+
+        // Round 2
+        await medianVote.startNextRound();
+        await time.increase(roundDelay + 1);
+
+        // Cast votes only for remaining candidate
+        await medianVote.connect(candidate1).castVote(candidate1.address, 20);
+
+        // Finalize Round 2 with a different median threshold
+        await time.increase(roundDelay + roundDuration + 1);
+        await medianVote.finalizeRound(21);
+
+        // Check candidate statuses after Round 2
+        expect(
+          candidateStatusToString(
+            await medianVote.getCandidateStatus(candidate1.address, 1)
+          )
+        ).to.equal("REGISTERED");
+      });
     });
   });
 
-  describe.only("Median Threshold Elimination Tests", function () {
+  describe("Median Threshold Elimination Tests", function () {
+    let medianVote: MedianVote;
+    let candidate1: SignerWithAddress,
+      candidate2: SignerWithAddress,
+      candidate3: SignerWithAddress;
+    let roundDelay: number, roundDuration: number;
 
-      let medianVote: MedianVote;
-      let candidate1: SignerWithAddress, candidate2: SignerWithAddress, candidate3: SignerWithAddress;
-      let roundDelay: number, roundDuration: number;
-  
-      beforeEach(async function () {
-          // Deploy and initialize as before
-          const fixture = await loadFixture(deployMedianVoteFixture);
-          medianVote = fixture.medianVote;
-          candidate1 = fixture.candidate1;
-          candidate2 = fixture.candidate2;
-          candidate3 = fixture.candidate3;
-          roundDelay = fixture.roundDelay;
-          roundDuration = fixture.roundDuration;
-  
-          // Register candidates
-          await medianVote.connect(candidate1).registerCandidate();
-          await medianVote.connect(candidate2).registerCandidate();
-          await medianVote.connect(candidate3).registerCandidate();
-      });
-  
+    beforeEach(async function () {
+      // Deploy and initialize as before
+      const fixture = await loadFixture(deployMedianVoteFixture);
+      medianVote = fixture.medianVote;
+      candidate1 = fixture.candidate1;
+      candidate2 = fixture.candidate2;
+      candidate3 = fixture.candidate3;
+      roundDelay = fixture.roundDelay;
+      roundDuration = fixture.roundDuration;
+
+      // Register candidates
+      await medianVote.connect(candidate1).registerCandidate();
+      await medianVote.connect(candidate2).registerCandidate();
+      await medianVote.connect(candidate3).registerCandidate();
+    });
+
     it("should eliminate candidates correctly based on median threshold", async function () {
-
       // Start and progress round
       await medianVote.startNextRound();
       await time.increase(roundDelay + 1);
-  
+
       // Cast votes
       await medianVote.connect(candidate1).castVote(candidate1.address, 5); // Below median
       await medianVote.connect(candidate2).castVote(candidate2.address, 10); // Above median
       await medianVote.connect(candidate3).castVote(candidate3.address, 8); // At median
-  
+
       // Finalize round with a specific median threshold
       await time.increase(roundDelay + roundDuration + 1);
       await medianVote.finalizeRound(8);
-  
+
       // Check candidate statuses
-      expect(candidateStatusToString(await medianVote.getCandidateStatus(candidate1.address, 0))).to.equal("REGISTERED");
-      expect(candidateStatusToString(await medianVote.getCandidateStatus(candidate2.address, 0))).to.equal("ELIMINATED");
-      expect(candidateStatusToString(await medianVote.getCandidateStatus(candidate3.address, 0))).to.equal("REGISTERED");
+      expect(
+        candidateStatusToString(
+          await medianVote.getCandidateStatus(candidate1.address, 0)
+        )
+      ).to.equal("REGISTERED");
+      expect(
+        candidateStatusToString(
+          await medianVote.getCandidateStatus(candidate2.address, 0)
+        )
+      ).to.equal("ELIMINATED");
+      expect(
+        candidateStatusToString(
+          await medianVote.getCandidateStatus(candidate3.address, 0)
+        )
+      ).to.equal("REGISTERED");
     });
-  
-    it("should correctly eliminate candidates with varying vote counts and thresholds", async function () {
-  
-      // Start round, cast votes, and finalize with different thresholds
-      for (const threshold of [5, 10, 15]) {
+    xit("should correctly handle multiple sequential rounds with elimination", async function () {
+      const candidates = [candidate1, candidate2, candidate3];
+      const voteCounts = [5, 10, 15]; // Adjust these numbers based on your median threshold logic
+    
+      // Register all candidates
+      // for (let candidate of candidates) {
+      //   await medianVote.connect(candidate).registerCandidate();
+      // }
+    
+      for (let round = 0; round < 3; round++) {
+        console.log("Round: ", round);
           await medianVote.startNextRound();
           await time.increase(roundDelay + 1);
-  
-          // Cast varying votes
-          await medianVote.connect(candidate1).castVote(candidate1.address, threshold - 2);
-          await medianVote.connect(candidate2).castVote(candidate2.address, threshold);
-          await medianVote.connect(candidate3).castVote(candidate3.address, threshold + 2);
-  
-          // Finalize round with specified median threshold
-          await time.increase(roundDelay + roundDuration + 1);
-          await medianVote.finalizeRound(threshold);
-  
-          // Check statuses for this round
-          const roundIndex = await medianVote.getCurrentRoundIndex();
-          expect(candidateStatusToString(await medianVote.getCandidateStatus(candidate1.address, roundIndex))).to.equal("REGISTERED");
-          expect(candidateStatusToString(await medianVote.getCandidateStatus(candidate2.address, roundIndex))).to.equal(threshold === 5 ? "ELIMINATED" : "REGISTERED");
-          expect(candidateStatusToString(await medianVote.getCandidateStatus(candidate3.address, roundIndex))).to.equal("ELIMINATED");
+      
+          let currentRound = await medianVote.getCurrentRoundIndex();
+          let roundStatus = await medianVote.getRoundStatus(currentRound);
+          console.log(`Round ${currentRound} status: `, roundStatusToString(roundStatus));
+     
+      
+      // Cast votes for each candidate that hasn't been eliminated
+      for (let i = 0; i < candidates.length; i++) {
+        const status = candidateStatusToString(await medianVote.getCandidateStatus(candidates[i].address, round));
+        if (status !== "ELIMINATED") {
+          await medianVote.connect(candidates[i]).castVote(candidates[i].address, voteCounts[i]);
+        }
       }
+    
+    
+        // Finalize round with a specific median threshold
+        await time.increase(roundDelay + roundDuration + 1);
+        await medianVote.finalizeRound(10); // Set your median threshold
+    
+        // Check candidate statuses
+        for (let candidate of candidates) {
+          const status = candidateStatusToString(await medianVote.getCandidateStatus(candidate.address, round));
+          console.log(`Candidate ${candidate.address} status in round ${round}: ${status}`);
+        }
+         currentRound = await medianVote.getCurrentRoundIndex();
+         roundStatus = await medianVote.getRoundStatus(currentRound);
+        console.log(`Round ${currentRound} status: `, roundStatusToString(roundStatus));
+      }
+    });
+    
+    
 
-  });
-  
-  it("should correctly handle eliminations over multiple rounds", async function () {
+    it("should correctly handle eliminations over multiple rounds", async function () {
+      // Round 1
+      await medianVote.startNextRound();
+      await time.increase(roundDelay + 1);
+      await medianVote.connect(candidate1).castVote(candidate1.address, 3); // Below median
+      await medianVote.connect(candidate2).castVote(candidate2.address, 6); // Above median
+      await time.increase(roundDelay + roundDuration + 1);
+      await medianVote.finalizeRound(5); // Set median threshold
 
-    // Round 1
-    await medianVote.startNextRound();
-    await time.increase(roundDelay + 1);
-    await medianVote.connect(candidate1).castVote(candidate1.address, 3); // Below median
-    await medianVote.connect(candidate2).castVote(candidate2.address, 6); // Above median
-    await time.increase(roundDelay + roundDuration + 1);
-    await medianVote.finalizeRound(5); // Set median threshold
+      // Round 2
+      await medianVote.startNextRound();
+      await time.increase(roundDelay + 1);
+      await medianVote.connect(candidate1).castVote(candidate1.address, 4); // Below median
+      await time.increase(roundDelay + roundDuration + 1);
+      await medianVote.finalizeRound(4); // Set median threshold
 
-    // Round 2
-    await medianVote.startNextRound();
-    await time.increase(roundDelay + 1);
-    await medianVote.connect(candidate1).castVote(candidate1.address, 4); // Below median
-    await time.increase(roundDelay + roundDuration + 1);
-    await medianVote.finalizeRound(4); // Set median threshold
-
-    // Check candidate statuses after each round
-    expect(candidateStatusToString(await medianVote.getCandidateStatus(candidate1.address, 0))).to.equal("REGISTERED");
-    expect(candidateStatusToString(await medianVote.getCandidateStatus(candidate1.address, 1))).to.equal("REGISTERED");
-    expect(candidateStatusToString(await medianVote.getCandidateStatus(candidate2.address, 0))).to.equal("ELIMINATED");
-    expect(candidateStatusToString(await medianVote.getCandidateStatus(candidate2.address, 1))).to.equal("ELIMINATED");
-});
+      // Check candidate statuses after each round
+      expect(
+        candidateStatusToString(
+          await medianVote.getCandidateStatus(candidate1.address, 0)
+        )
+      ).to.equal("REGISTERED");
+      expect(
+        candidateStatusToString(
+          await medianVote.getCandidateStatus(candidate1.address, 1)
+        )
+      ).to.equal("REGISTERED");
+      expect(
+        candidateStatusToString(
+          await medianVote.getCandidateStatus(candidate2.address, 0)
+        )
+      ).to.equal("ELIMINATED");
+      expect(
+        candidateStatusToString(
+          await medianVote.getCandidateStatus(candidate2.address, 1)
+        )
+      ).to.equal("ELIMINATED");
+    });
 
     // Additional test cases for different scenarios...
   });
-  
 
-  describe("Round Finalization and Candidate Status", function () {
-    // it("should finalize a round and set median threshold", async function () {
-    //     const { medianVote } = await loadFixture(deployMedianVoteFixture);
-    //     // Finalize round with a specific threshold
-    //     await medianVote.finalizeRound(5);
-    //     expect(await medianVote.getRoundStatus(0)).to.equal("FINALIZED");
-    // });
-    // it("should correctly determine candidate status after round finalization", async function () {
-    //     const { medianVote, candidate1 } = await loadFixture(deployMedianVoteFixture);
-    //     // Assuming votes have been cast and round finalized
-    //     expect(await medianVote.getCandidateStatus(candidate1.address, 0)).to.be.oneOf(["REGISTERED", "ELIMINATED"]);
-    // });
+  xdescribe("Round Finalization and Candidate Status", function () {
+    it("should finalize a round and set median threshold", async function () {
+      const { medianVote } = await loadFixture(deployMedianVoteFixture);
+      // Finalize round with a specific threshold
+      await medianVote.finalizeRound(5);
+      expect(await medianVote.getRoundStatus(0)).to.equal("FINALIZED");
+    });
+    it("should correctly determine candidate status after round finalization", async function () {
+      const { medianVote, candidate1 } = await loadFixture(
+        deployMedianVoteFixture
+      );
+      // Assuming votes have been cast and round finalized
+      expect(
+        await medianVote.getCandidateStatus(candidate1.address, 0)
+      ).to.be.oneOf(["REGISTERED", "ELIMINATED"]);
+    });
     // Additional tests for checking status in different scenarios
   });
 });

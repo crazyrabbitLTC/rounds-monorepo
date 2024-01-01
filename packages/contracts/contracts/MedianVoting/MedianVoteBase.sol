@@ -126,22 +126,6 @@ abstract contract MedianVoteBase is Initializable, IMedianVote {
         address _candidate,
         uint256 _voteAmount
     ) internal {
-        // Get the last round index
-        uint256 _roundIndex = _getCurrentRoundIndex();
-        uint256 previousRound = _roundIndex == 0 ? 0 : _roundIndex - 1;
-
-        // Require the candidate to be registered
-        if (
-            _getCandidateStatus(_candidate, previousRound) !=
-            CandidateStatus.REGISTERED
-        ) revert InvalidCandidate();
-
-        // Require the voter to be registered
-        if (
-            _getCandidateStatus(_voter, previousRound) !=
-            CandidateStatus.REGISTERED
-        ) revert InvalidVoter();
-
         // require the round to be active
         if (_getRoundStatus(_getCurrentRoundIndex()) != RoundStatus.ACTIVE)
             revert RoundNotActive();
@@ -161,6 +145,11 @@ abstract contract MedianVoteBase is Initializable, IMedianVote {
         address _candidate,
         uint256 _round
     ) internal view returns (CandidateStatus) {
+        //  If a candidate has been marked as eliminated, return early
+        // This is for situations where a candidate is manually eliminated either individually or during an onchain round finalization
+        if (_candidateStatus[_candidate] == CandidateStatus.ELIMINATED)
+            return CandidateStatus.ELIMINATED;
+
         // If the candidate is not registered, return unregistered
         if (_candidateStatus[_candidate] == CandidateStatus.UNREGISTERED) {
             return CandidateStatus.UNREGISTERED;
