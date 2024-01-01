@@ -96,9 +96,11 @@ abstract contract MedianVoteBase is Initializable, IMedianVote {
         uint256 round
     ) internal view returns (RoundStatus) {
         if (round >= rounds.length) return RoundStatus.DOES_NOT_EXIST;
-        
-        if (block.timestamp < rounds[round].startingTime + rounds[round].startDelay)
-            return RoundStatus.PENDING;
+
+        if (
+            block.timestamp <
+            rounds[round].startingTime + rounds[round].startDelay
+        ) return RoundStatus.PENDING;
         if (block.timestamp < rounds[round].endingTime)
             return RoundStatus.ACTIVE;
 
@@ -165,7 +167,7 @@ abstract contract MedianVoteBase is Initializable, IMedianVote {
         }
 
         // Handle the first round scenario
-        if (_round == 0) {
+        if (_round == 0 && _getRoundStatus(_round) != RoundStatus.FINALIZED) {
             // In the first round, a registered candidate is not eliminated yet
             return CandidateStatus.REGISTERED;
         }
@@ -175,8 +177,8 @@ abstract contract MedianVoteBase is Initializable, IMedianVote {
             revert RoundNotFinalized();
         }
 
-        // Check elimination status in previous rounds
-        for (uint256 i = 0; i < _round; i++) {
+        // Check elimination status for each finalized round up to and including the current round
+        for (uint256 i = 0; i <= _round; i++) {
             if (
                 _roundCandidateVotes[i][_candidate] > rounds[i].medianThreshold
             ) {
