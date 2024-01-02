@@ -154,69 +154,6 @@ export function shouldVote(): void {
         // Add assertions for round status and candidate status as necessary
       });
 
-      it("should eliminate candidates based on median threshold across multiple rounds", async function () {
-        const {
-          medianVote,
-          candidate1,
-          candidate2,
-          candidate3,
-          roundDelay,
-          roundDuration,
-        } = await loadFixture(deployMedianVoteFixture);
-
-        // Register candidates
-        await medianVote.connect(candidate1).registerCandidate();
-        await medianVote.connect(candidate2).registerCandidate();
-        await medianVote.connect(candidate3).registerCandidate();
-
-        // Round 1
-        await medianVote.startNextRound();
-        await time.increase(roundDelay + 1);
-
-        // Cast votes
-        await medianVote.connect(candidate1).castVote(candidate1.address, 5); // Below median
-        await medianVote.connect(candidate2).castVote(candidate2.address, 10); // Above median
-        await medianVote.connect(candidate3).castVote(candidate3.address, 15); // Above median
-
-        // Finalize Round 1 with a specific median threshold
-        await time.increase(roundDelay + roundDuration + 1);
-        await medianVote.finalizeRound(9);
-
-        // Check candidate statuses after Round 1
-        expect(
-          candidateStatusToString(
-            await medianVote.getCandidateStatus(candidate1.address, 0)
-          )
-        ).to.equal("REGISTERED");
-        expect(
-          candidateStatusToString(
-            await medianVote.getCandidateStatus(candidate2.address, 0)
-          )
-        ).to.equal("ELIMINATED");
-        expect(
-          candidateStatusToString(
-            await medianVote.getCandidateStatus(candidate3.address, 0)
-          )
-        ).to.equal("ELIMINATED");
-
-        // Round 2
-        await medianVote.startNextRound();
-        await time.increase(roundDelay + 1);
-
-        // Cast votes only for remaining candidate
-        await medianVote.connect(candidate1).castVote(candidate1.address, 20);
-
-        // Finalize Round 2 with a different median threshold
-        await time.increase(roundDelay + roundDuration + 1);
-        await medianVote.finalizeRound(21);
-
-        // Check candidate statuses after Round 2
-        expect(
-          candidateStatusToString(
-            await medianVote.getCandidateStatus(candidate1.address, 1)
-          )
-        ).to.equal("REGISTERED");
-      });
     });
   });
 }

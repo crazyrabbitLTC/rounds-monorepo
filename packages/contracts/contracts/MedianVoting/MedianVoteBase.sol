@@ -192,24 +192,24 @@ abstract contract MedianVoteBase is Initializable, IMedianVote {
         if (_candidateStatus[_candidate] == CandidateStatus.ELIMINATED)
             return CandidateStatus.ELIMINATED;
 
-        // If the candidate is not registered, return unregistered
+        // If the candidate is not registered, return unregistered, this is the default based on how solidity works
         if (_candidateStatus[_candidate] == CandidateStatus.UNREGISTERED) {
             return CandidateStatus.UNREGISTERED;
         }
 
         // Handle the first round scenario
-        if (_round == 0 && _getRoundStatus(_round) != RoundStatus.FINALIZED) {
-            // In the first round, a registered candidate is not eliminated yet
+        if (_round == 0) {
+            // Candidates can only be eliminated after the first round (if they are manually eliminated they will be marked as such above)
             return CandidateStatus.REGISTERED;
         }
 
-        // Ensure the round is finalized before proceeding
-        if (_getRoundStatus(_round) != RoundStatus.FINALIZED) {
+        // Candidates status is determined by the median threshold of the previous round, so we check to be sure previous round is finalized
+        if (_getRoundStatus(_round - 1) != RoundStatus.FINALIZED) {
             revert RoundNotFinalized();
         }
 
-        // Check elimination status for each finalized round up to and including the current round
-        for (uint256 i = 0; i <= _round; i++) {
+        // Check elimination status for each finalized round up to but not including the current round (since it's not finalized yet)
+        for (uint256 i = 0; i < _round; i++) {
             if (
                 _roundCandidateVotes[i][_candidate] > rounds[i].medianThreshold
             ) {
