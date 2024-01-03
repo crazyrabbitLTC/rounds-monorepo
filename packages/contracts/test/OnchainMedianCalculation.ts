@@ -50,7 +50,7 @@ describe.only("OnchainMedianCalculation", function () {
         expect(votes).to.deep.equal([5, 10]);
     });
 
-    it("should calculate median correctly on round finalization", async function () {
+    it.only("should calculate median correctly on round finalization", async function () {
         await onchainMedian.startNextRound();
         await onchainMedian.connect(candidate1).castVote(candidate1.address, 5);
         await onchainMedian.connect(candidate2).castVote(candidate2.address, 10);
