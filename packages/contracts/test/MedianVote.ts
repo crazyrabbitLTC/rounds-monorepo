@@ -47,7 +47,7 @@ export async function deployMedianVoteFixture() {
   };
 }
 
-describe.only("MedianVote", function () {
+describe("MedianVote", function () {
   shouldDeployAndInitializeContract();
   shouldRegister();
   shouldManageRounds();

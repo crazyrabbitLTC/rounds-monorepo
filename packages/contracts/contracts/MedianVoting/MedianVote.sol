@@ -9,7 +9,7 @@ contract MedianVote is MedianVoteBase {
     function initialize(
         uint256 roundDuration,
         uint256 roundDelay
-    ) public initializer {
+    ) public virtual initializer {
         MedianVoteBase.__MedianVoteBaseInit(roundDuration, roundDelay);
     }
 
